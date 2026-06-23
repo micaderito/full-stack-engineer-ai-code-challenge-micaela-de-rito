@@ -5,8 +5,13 @@ namespace StratusFabTracker.Api.Application;
 public sealed class DashboardService
 {
     private readonly ISpoolRepository _repository;
+    private readonly IClock _clock;
 
-    public DashboardService(ISpoolRepository repository) => _repository = repository;
+    public DashboardService(ISpoolRepository repository, IClock clock)
+    {
+        _repository = repository;
+        _clock = clock;
+    }
 
     public async Task<DashboardDto> GetDashboardAsync()
     {
@@ -14,7 +19,7 @@ public sealed class DashboardService
         var byStation = Enum.GetValues<Station>()
             .ToDictionary(s => s.ToString(), s => spools.Count(x => x.CurrentStation == s));
 
-        var now = DateOnly.FromDateTime(DateTime.UtcNow);
+        var now = DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime);
         var pastDue = spools.Count(x => x.DueDate < now && x.CurrentStation != Station.Installed);
 
         return new DashboardDto(byStation, pastDue);

@@ -6,14 +6,16 @@ namespace StratusFabTracker.Tests;
 
 public class DashboardServiceTests
 {
+    private static readonly DateTimeOffset _now = new(2026, 6, 23, 12, 0, 0, TimeSpan.Zero);
+    private static DateOnly Today => DateOnly.FromDateTime(_now.UtcDateTime);
+
     private static DashboardService Build(IEnumerable<Spool>? spools = null)
-        => new(new FakeSpoolRepository(spools));
+        => new(new FakeSpoolRepository(spools), new FakeClock(_now));
 
     [Fact]
     public async Task GetDashboardAsync_returns_all_stations_in_dictionary()
     {
-        var svc = Build();
-        var dto = await svc.GetDashboardAsync();
+        var dto = await Build().GetDashboardAsync();
 
         foreach (var station in Enum.GetValues<Station>())
             Assert.True(dto.WipByStation.ContainsKey(station.ToString()));
@@ -37,7 +39,7 @@ public class DashboardServiceTests
             SpoolFactory.Create("S2"), // no history → Detailing
             SpoolFactory.Create("S3", history:
             [
-                new StatusEvent(Station.Weld, DateTimeOffset.UtcNow, "system")
+                new StatusEvent(Station.Weld, _now, "system")
             ])
         };
 
@@ -49,37 +51,23 @@ public class DashboardServiceTests
     }
 
     [Fact]
-    public async Task GetDashboardAsync_counts_past_due_non_installed_spools()
+    public async Task GetDashboardAsync_counts_past_due_non_installed_spools_and_excludes_installed()
     {
-        var yesterday = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
-        var tomorrow = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
+        var yesterday = Today.AddDays(-1);
+        var tomorrow = Today.AddDays(1);
 
         var spools = new[]
         {
-            SpoolFactory.Create("S1", dueDate: yesterday), // past due, Detailing
+            SpoolFactory.Create("S1", dueDate: yesterday),                    // past due, Detailing → counts
             SpoolFactory.Create("S2", dueDate: yesterday, history:
             [
-                new StatusEvent(Station.Installed, DateTimeOffset.UtcNow, "system")
-            ]), // past due but Installed — should NOT count
-            SpoolFactory.Create("S3", dueDate: tomorrow), // not past due
+                new StatusEvent(Station.Installed, _now, "system")
+            ]),                                                               // past due but Installed → excluded
+            SpoolFactory.Create("S3", dueDate: tomorrow),                     // not past due → excluded
         };
 
         var dto = await Build(spools).GetDashboardAsync();
 
         Assert.Equal(1, dto.PastDueCount);
-    }
-
-    [Fact]
-    public async Task GetDashboardAsync_installed_spools_not_counted_as_past_due()
-    {
-        var pastDue = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-5);
-        var spool = SpoolFactory.Create(dueDate: pastDue, history:
-        [
-            new StatusEvent(Station.Installed, DateTimeOffset.UtcNow, "system")
-        ]);
-
-        var dto = await Build([spool]).GetDashboardAsync();
-
-        Assert.Equal(0, dto.PastDueCount);
     }
 }
