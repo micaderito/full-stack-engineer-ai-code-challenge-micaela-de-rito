@@ -22,6 +22,7 @@ await SeedData.InitializeAsync(app.Services);
 
 app.MapGet("/api/dashboard", async (DashboardService service) => Results.Ok(await service.GetDashboardAsync()));
 app.MapGet("/api/throughput", async (ThroughputService service) => Results.Ok(await service.GetThroughputAsync()));
+app.MapGet("/api/spools", async (ISpoolRepository repo) => Results.Ok(await repo.GetAllAsync()));
 app.MapGet("/api/spools/{id}", async (string id, ISpoolRepository repo) =>
 {
     var spool = await repo.GetByIdAsync(id);
