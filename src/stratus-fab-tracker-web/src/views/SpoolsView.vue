@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 type BomItem = { partNumber: string; quantity: number };
@@ -45,6 +45,35 @@ const filtered = computed(() => {
     STATIONS[s.currentStation].toLowerCase().includes(q),
   );
 });
+
+const PAGE_SIZE = 20;
+const currentPage = ref(1);
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / PAGE_SIZE)));
+
+const paged = computed(() => {
+  const start = (currentPage.value - 1) * PAGE_SIZE;
+  return filtered.value.slice(start, start + PAGE_SIZE);
+});
+
+const rangeStart = computed(() =>
+  filtered.value.length === 0 ? 0 : (currentPage.value - 1) * PAGE_SIZE + 1,
+);
+const rangeEnd = computed(() =>
+  Math.min(currentPage.value * PAGE_SIZE, filtered.value.length),
+);
+
+// Reset to the first page whenever the filter result shrinks/changes under us.
+watch(filtered, () => {
+  if (currentPage.value > totalPages.value) currentPage.value = totalPages.value;
+});
+watch(search, () => {
+  currentPage.value = 1;
+});
+
+function goToPage(page: number) {
+  currentPage.value = Math.min(Math.max(1, page), totalPages.value);
+}
 
 async function load() {
   try {
@@ -111,7 +140,12 @@ onMounted(load);
     </div>
 
     <p class="count-label" aria-live="polite">
-      Showing {{ filtered.length }} of {{ spools.length }} spools
+      <template v-if="filtered.length">
+        Showing {{ rangeStart }}–{{ rangeEnd }} of {{ filtered.length }}
+        <template v-if="filtered.length !== spools.length"> (filtered from {{ spools.length }})</template>
+        spools
+      </template>
+      <template v-else>Showing 0 of {{ spools.length }} spools</template>
     </p>
 
     <div class="table-wrap card" role="region" aria-label="Spools table">
@@ -136,7 +170,7 @@ onMounted(load);
         </thead>
         <tbody v-if="spools.length">
           <tr
-            v-for="spool in filtered"
+            v-for="spool in paged"
             :key="spool.id"
             :class="`row--${STATION_KEYS[spool.currentStation]}`"
             class="row--clickable"
@@ -188,6 +222,30 @@ onMounted(load);
         </tbody>
       </table>
     </div>
+
+    <nav v-if="totalPages > 1" class="pagination" aria-label="Spools pagination">
+      <button
+        class="btn btn--secondary btn--sm"
+        :disabled="currentPage === 1"
+        @click="goToPage(currentPage - 1)"
+      >
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M8.5 2.5L4 7l4.5 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Previous
+      </button>
+      <span class="pagination__status">Page {{ currentPage }} of {{ totalPages }}</span>
+      <button
+        class="btn btn--secondary btn--sm"
+        :disabled="currentPage === totalPages"
+        @click="goToPage(currentPage + 1)"
+      >
+        Next
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M5.5 2.5L10 7l-4.5 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </nav>
   </div>
 </template>
 
@@ -334,5 +392,20 @@ td {
   padding: var(--space-10) var(--space-4);
   color: var(--color-text-tertiary);
   font-size: var(--text-sm);
+}
+
+/* ── Pagination ── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+.pagination__status {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  min-width: 110px;
+  text-align: center;
 }
 </style>
