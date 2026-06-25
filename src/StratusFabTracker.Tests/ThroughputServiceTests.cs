@@ -107,4 +107,47 @@ public class ThroughputServiceTests
         var expected = dto.Daily.Average(d => d.Completed);
         Assert.Equal(expected, dto.CompletedPerDay);
     }
+
+    [Fact]
+    public async Task GetThroughputAsync_counts_multiple_installs_on_same_day()
+    {
+        var day = _now.AddDays(-2);
+        var spools = new[]
+        {
+            SpoolFactory.Create("S1", history: [new StatusEvent(Station.Installed, day, "system")]),
+            SpoolFactory.Create("S2", history: [new StatusEvent(Station.Installed, day, "system")]),
+            SpoolFactory.Create("S3", history: [new StatusEvent(Station.Installed, day, "system")]),
+        };
+
+        var dto = await Build(spools).GetThroughputAsync();
+
+        var dayEntry = dto.Daily.Single(d => d.Day == DateOnly.FromDateTime(day.UtcDateTime));
+        Assert.Equal(3, dayEntry.Completed);
+    }
+
+    [Fact]
+    public async Task GetThroughputAsync_counts_install_on_window_boundary_start()
+    {
+        var windowStart = _now.AddDays(-13);
+        var spool = SpoolFactory.Create(history:
+        [
+            new StatusEvent(Station.Installed, windowStart, "system")
+        ]);
+
+        var dto = await Build([spool]).GetThroughputAsync();
+
+        var dayEntry = dto.Daily.First();
+        Assert.Equal(1, dayEntry.Completed);
+    }
+
+    [Fact]
+    public async Task GetThroughputAsync_due_per_day_counts_spools_due_in_window()
+    {
+        var spoolsDueInWindow = Enumerable.Range(0, 7).Select(i =>
+            SpoolFactory.Create(id: $"S{i}", dueDate: Today.AddDays(-i % 7))).ToArray();
+
+        var dto = await Build(spoolsDueInWindow).GetThroughputAsync();
+
+        Assert.True(dto.DuePerDay > 0);
+    }
 }
