@@ -18,6 +18,9 @@ coverage-report/
 # Local interview runtime state
 .interview-state/
 
+# Local preview-server config
+.claude/launch.json
+
 # Local machine/editor noise
 .DS_Store
 Thumbs.db
