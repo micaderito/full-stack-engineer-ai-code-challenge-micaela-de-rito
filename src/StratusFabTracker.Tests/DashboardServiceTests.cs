@@ -51,6 +51,17 @@ public class DashboardServiceTests
     }
 
     [Fact]
+    public async Task GetDashboardAsync_spool_due_today_is_not_past_due()
+    {
+        var today = Today;
+        var spool = SpoolFactory.Create("S1", dueDate: today);
+
+        var dto = await Build([spool]).GetDashboardAsync();
+
+        Assert.Equal(0, dto.PastDueCount);
+    }
+
+    [Fact]
     public async Task GetDashboardAsync_counts_past_due_non_installed_spools_and_excludes_installed()
     {
         var yesterday = Today.AddDays(-1);
