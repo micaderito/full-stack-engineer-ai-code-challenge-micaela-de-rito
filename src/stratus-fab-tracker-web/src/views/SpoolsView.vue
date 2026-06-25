@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 
 type BomItem = { partNumber: string; quantity: number };
 type StatusEvent = { station: number; changedAt: string; changedBy: string };
@@ -16,10 +17,16 @@ type Spool = {
 const STATIONS = ['Detailing', 'Cut', 'Weld', 'QC', 'Shipped', 'Installed'] as const;
 const STATION_KEYS = ['detailing', 'cut', 'weld', 'qc', 'shipped', 'installed'] as const;
 
+const router = useRouter();
+
 const spools = ref<Spool[]>([]);
 const search = ref('');
 const error = ref('');
 const advancing = ref<Set<string>>(new Set());
+
+function goToDetail(spool: Spool) {
+  router.push({ name: 'SpoolDetail', params: { id: spool.id } });
+}
 
 const today = new Date();
 today.setHours(0, 0, 0, 0);
@@ -132,6 +139,8 @@ onMounted(load);
             v-for="spool in filtered"
             :key="spool.id"
             :class="`row--${STATION_KEYS[spool.currentStation]}`"
+            class="row--clickable"
+            @click="goToDetail(spool)"
           >
             <td>
               <span class="spool-num">{{ spool.spoolNumber }}</span>
@@ -155,7 +164,7 @@ onMounted(load);
                 v-if="spool.currentStation < 5"
                 class="btn btn--secondary btn--sm"
                 :disabled="advancing.has(spool.id)"
-                @click="advance(spool)"
+                @click.stop="advance(spool)"
               >
                 <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
                   <path d="M2.5 6.5h8M7 3l3.5 3.5L7 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
@@ -268,6 +277,9 @@ tbody tr:last-child {
 }
 tbody tr:hover {
   filter: brightness(0.97);
+}
+.row--clickable {
+  cursor: pointer;
 }
 td {
   padding: var(--space-3) var(--space-4);
